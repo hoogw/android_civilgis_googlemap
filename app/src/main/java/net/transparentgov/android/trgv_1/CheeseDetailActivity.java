@@ -109,13 +109,17 @@ public class CheeseDetailActivity extends AppCompatActivity
     private double _lng;
     private int _zoom;
 
+    private Marker lastOpened = null;
+
 
     private GeoJsonLayer _geojson_layer_last = null;
 
-
-
+    private GeoJsonLayer _geojson_layer_current = null;
+    private GeoJsonLayer _geojson_area_limit = null;
 
     private GoogleMap mMap;
+
+    private boolean load_area_limit = false;
 
 
     /**
@@ -267,6 +271,11 @@ public class CheeseDetailActivity extends AppCompatActivity
         mMap = googleMap;
 
 
+        _geojson_layer_current = null;
+        _geojson_layer_last = null;
+
+
+
         if (Area.hasTile(area_subject)) {
 
             add_tile();
@@ -285,16 +294,7 @@ public class CheeseDetailActivity extends AppCompatActivity
 
 
 
-        // this is a bug, can't disable auto center
-        // ...............disable auto center when marker clicked................
-        mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-            @Override
-            public boolean onMarkerClick(Marker marker) {
 
-                return true;
-            }
-        });
-        //.....................................................................
 
 
 
@@ -362,7 +362,39 @@ public class CheeseDetailActivity extends AppCompatActivity
 
 
 
+
+        // ...............disable auto center when marker clicked................
+
+
+
+        // this is done in geojson util jar,
+
+       //return true
+
+        /*map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                listener.onFeatureClick(getFeature(marker));
+                // returen true will disable auto center when click marker
+                return true;
+                //return false;
+            }
+        });*/
+
+
+        //.....................................................................
+
+
+
+
+
+
+
     }// on map ready
+
+
+
+
 
 
 
@@ -568,6 +600,9 @@ public class CheeseDetailActivity extends AppCompatActivity
                 // Open a stream from the URL
                 InputStream stream = new URL(params[0]).openStream();
 
+                Boolean is_arealimit = params[0].toLowerCase().contains("maparealimit");
+
+
                 String line;
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
@@ -604,7 +639,7 @@ public class CheeseDetailActivity extends AppCompatActivity
                     Log.e("--return number- ", result.toString());
 
                     // return a number
-                    removeLastGeoJsonLayerFromMap(_geojson_layer_last);
+                   // removeLastGeoJsonLayerFromMap( _geojson_layer_last);
 
 
 
@@ -618,11 +653,17 @@ public class CheeseDetailActivity extends AppCompatActivity
 
                      // return geojson
 
+                     if (is_arealimit){
 
+                           _geojson_area_limit = new GeoJsonLayer(mMap, new JSONObject(result.toString()));
+                         return _geojson_area_limit;
 
-                    _geojson_layer_last = new GeoJsonLayer(mMap, new JSONObject(result.toString()));
+                     }else {
 
-                    return _geojson_layer_last;
+                         _geojson_layer_current = new GeoJsonLayer(mMap, new JSONObject(result.toString()));
+
+                         return _geojson_layer_current;
+                     }
 
                 }
 
@@ -643,12 +684,19 @@ public class CheeseDetailActivity extends AppCompatActivity
 
         @Override
         protected void onPostExecute(GeoJsonLayer layer) {
+
+            removeLastGeoJsonLayerFromMap(_geojson_layer_last);
+
             if (layer != null) {
 
-                removeLastGeoJsonLayerFromMap(_geojson_layer_last);
+                  Log.e("layer not null", "+++++++++++++++++++++++++++++++++++");
 
 
                 addGeoJsonLayerToMap(layer);
+
+
+                  _geojson_layer_last = _geojson_layer_current;
+
             }
         }
 
@@ -660,16 +708,20 @@ public class CheeseDetailActivity extends AppCompatActivity
     private void removeLastGeoJsonLayerFromMap(GeoJsonLayer last_geoJsonlayer) {
 
         try {
-          //  if (last_geoJsonlayer != null) {
+            if (last_geoJsonlayer == null) {
 
-            Log.e("-last geojson-", last_geoJsonlayer.toString());
+                Log.e("-last geojson-", "nulllllllllllllllllllllllllllllllllllllllllllnullllllll");
+
+            }else {
                 last_geoJsonlayer.removeLayerFromMap();
 
 
-     Log.e("***** remove *******", last_geoJsonlayer.toString());
-          //  }
+           Log.e("***** remove *******", "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+           }
 
-
+           /* mMap.clear();
+            add_tile();
+            retrieveFileFromUrl("http://166.62.80.50:10/gis/api/maparealimit/" + _area_ +"/limit");*/
 
         }
         catch(RuntimeException rte){
@@ -691,7 +743,7 @@ public class CheeseDetailActivity extends AppCompatActivity
        // addColorsToMarkers(layer);
         layer.addLayerToMap();
 
-       Log.e("add geojson==", layer.toString());
+      // Log.e("add geojson==", layer.toString());
 
         // Demonstrate receiving features via GeoJsonLayer clicks.
         layer.setOnFeatureClickListener(new GeoJsonLayer.GeoJsonOnFeatureClickListener() {
@@ -704,7 +756,7 @@ public class CheeseDetailActivity extends AppCompatActivity
 
 
                     Random rnd = new Random();
-                    int random_color = Color.argb(255, rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256));
+                    int random_color = Color.argb(150, rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256));
 
 
                     // ---------------   highlight feature (clicked)  -----------------------
@@ -752,16 +804,23 @@ public class CheeseDetailActivity extends AppCompatActivity
 
                     GeoJsonLineStringStyle _line_style = new GeoJsonLineStringStyle();
                     _line_style.setColor(random_color);
-
+                    _line_style.setWidth(10);
                     feature.setLineStringStyle(_line_style);
 
 
 
                     GeoJsonPolygonStyle _plg_style = new GeoJsonPolygonStyle();
-                    _plg_style.setStrokeColor(random_color);
+                    //_plg_style.setStrokeColor(random_color);
+                    _plg_style.setFillColor(random_color);
 
                     feature.setPolygonStyle(_plg_style);
 
+
+                    GeoJsonPointStyle _point_style = new GeoJsonPointStyle();
+                    _point_style.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+
+
+                    feature.setPointStyle(_point_style);
 
                 // --------------   End --- -----------------   highlight feature (clicked)  -----------------------
 
